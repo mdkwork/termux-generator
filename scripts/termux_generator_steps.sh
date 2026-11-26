@@ -165,18 +165,18 @@ patch_apps() {
             strings_file="termux-apps-main/termux-app/app/src/main/res/values/strings.xml"
         fi
 
+        echo "[*] Changing visible app name to '$TERMUX_APP__DISPLAY_NAME'..."
+
+        # Make the value safe inside an XML entity declaration or text node.
+        # Bash replaces an unescaped '&' in the substitution with the matched
+        # text, so escape it to emit literal XML entities.
+        local display_name_xml="$TERMUX_APP__DISPLAY_NAME"
+        display_name_xml="${display_name_xml//&/\&amp;}"
+        display_name_xml="${display_name_xml//</\&lt;}"
+        display_name_xml="${display_name_xml//>/\&gt;}"
+        display_name_xml="${display_name_xml//\"/\&quot;}"
+
         if [[ -f "$strings_file" ]]; then
-            echo "[*] Changing visible app name to '$TERMUX_APP__DISPLAY_NAME'..."
-
-            # Make the value safe inside an XML entity declaration.
-            local display_name_xml="$TERMUX_APP__DISPLAY_NAME"
-            # Bash replaces an unescaped '&' in the substitution with the
-            # matched text, so escape it to emit literal XML entities.
-            display_name_xml="${display_name_xml//&/\&amp;}"
-            display_name_xml="${display_name_xml//</\&lt;}"
-            display_name_xml="${display_name_xml//>/\&gt;}"
-            display_name_xml="${display_name_xml//\"/\&quot;}"
-
             # Target the exact upstream structure:
             #   <!ENTITY TERMUX_APP_NAME "Termux">
             # After the package rename this may already read
@@ -191,6 +191,52 @@ patch_apps() {
         else
             echo "[!] Warning: Could not find $strings_file to change the app name."
         fi
+
+        # Addon apps have their own labels. replace_termux_name() rewrites
+        # "Termux:" to the custom package name in both entity declarations
+        # (API/Float/Widget/Tasker) and literal strings (Boot/GUI/Styling),
+        # so restore those labels to the requested display name as well.
+        # termux-x11 is intentionally excluded: it keeps its own name.
+        local addon addon_suffix addon_file candidate addon_display_xml addon_entity
+        for addon in termux-api termux-boot termux-float termux-gui \
+                     termux-styling termux-style termux-tasker termux-widget; do
+            case "$addon" in
+                termux-api)     addon_suffix="API" ;;
+                termux-boot)    addon_suffix="Boot" ;;
+                termux-float)   addon_suffix="Float" ;;
+                termux-gui)     addon_suffix="GUI" ;;
+                termux-styling) addon_suffix="Styling" ;;
+                termux-style)   addon_suffix="Style" ;;
+                termux-tasker)  addon_suffix="Tasker" ;;
+                termux-widget)  addon_suffix="Widget" ;;
+            esac
+
+            addon_file=""
+            for candidate in \
+                "termux-apps-main/$addon/app/src/main/res/values/strings.xml" \
+                "termux-apps-main/$addon/src/main/res/values/strings.xml"; do
+                if [[ -f "$candidate" ]]; then
+                    addon_file="$candidate"
+                    break
+                fi
+            done
+            [[ -z "$addon_file" ]] && continue
+
+            addon_display_xml="${display_name_xml}:$addon_suffix"
+            addon_entity="TERMUX_$(printf '%s' "$addon_suffix" | tr '[:lower:]' '[:upper:]')_APP_NAME"
+
+            echo "[*] Updating addon display name in $addon_file..."
+            ADDON_DISPLAY="$addon_display_xml" \
+            BASE_DISPLAY="$display_name_xml" \
+            PACKAGE_NAME="$TERMUX_APP__PACKAGE_NAME" \
+            ADDON_ENTITY="$addon_entity" \
+            perl -pi -e '
+                s{\Q$ENV{PACKAGE_NAME}\E:}{$ENV{BASE_DISPLAY}:}g;
+                s{(<!ENTITY\s+TERMUX_APP_NAME\s+")[^"]*(">)}{${1}$ENV{BASE_DISPLAY}${2}};
+                s{(<!ENTITY\s+\Q$ENV{ADDON_ENTITY}\E\s+")[^"]*(">)}{${1}$ENV{ADDON_DISPLAY}${2}};
+                s{(<string name="(?:app_name|application_name)">)[^<]*(</string>)}{${1}$ENV{ADDON_DISPLAY}${2}};
+            ' "$addon_file"
+        done
     fi
     # ---------------------------------
 }
