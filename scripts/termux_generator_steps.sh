@@ -152,9 +152,9 @@ patch_apps() {
         echo "[*] Changing visible app name to '$TERMUX_APP__DISPLAY_NAME'..."
         local strings_file=$(find termux-apps-main -path "*/res/values/strings.xml" | grep "termux-app" | head -n 1)
         if [ -n "$strings_file" ]; then
-            # First, replace the XML entity used by upstream Termux
+            # Replace the XML entity used by upstream Termux
             portable_sed_i -e "s|&TERMUX_APP_NAME;|$TERMUX_APP__DISPLAY_NAME|g" "$strings_file"
-            # Also, try the direct string replacement as a fallback
+            # Fallback string replacement
             portable_sed_i -e "s|<string name=\"application_name\">.*</string>|<string name=\"application_name\">$TERMUX_APP__DISPLAY_NAME</string>|g" "$strings_file"
         else
             echo "[!] Warning: Could not find strings.xml to change the app name."
