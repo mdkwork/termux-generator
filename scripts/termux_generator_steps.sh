@@ -152,6 +152,60 @@ patch_apps() {
 
 		migrate_termux_folder_tree termux-apps-main "$TERMUX_APP__PACKAGE_NAME"
     fi
+
+    # Restore branded launcher labels after replace_termux_name() has rewritten
+    # "Termux" and "Termux:" to the custom package name. termux-x11 is excluded.
+    if [[ -n "${TERMUX_APP__DISPLAY_NAME:-}" && "$TERMUX_APP__DISPLAY_NAME" != "Termux" ]]; then
+        local display="$TERMUX_APP__DISPLAY_NAME"
+        display="${display//&/\&amp;}"
+        display="${display//</\&lt;}"
+        display="${display//>/\&gt;}"
+        display="${display//\"/\&quot;}"
+
+        local main_strings addon suffix file candidate
+        if [[ "$TERMUX_APP_TYPE" == "play-store" ]]; then
+            main_strings="termux-apps-main/termux-app/src/main/res/values/strings.xml"
+        else
+            main_strings="termux-apps-main/termux-app/app/src/main/res/values/strings.xml"
+        fi
+
+        if [[ -f "$main_strings" ]]; then
+            NAME="$display" LABEL="$display" PACKAGE="$TERMUX_APP__PACKAGE_NAME" perl -pi -e '
+                s{\Q$ENV{PACKAGE}\E:}{$ENV{NAME}:}g;
+                s{(<!ENTITY\s+TERMUX_APP_NAME\s+")[^"]*(">)}{${1}$ENV{NAME}${2}};
+                s{(<string name="(?:app_name|application_name)">)[^<]*(</string>)}{${1}$ENV{LABEL}${2}};
+            ' "$main_strings"
+        fi
+
+        for addon in termux-api termux-boot termux-float termux-gui \
+                     termux-styling termux-style termux-tasker termux-widget; do
+            case "$addon" in
+                termux-api)     suffix="API" ;;
+                termux-boot)    suffix="Boot" ;;
+                termux-float)   suffix="Float" ;;
+                termux-gui)     suffix="GUI" ;;
+                termux-styling) suffix="Styling" ;;
+                termux-style)   suffix="Style" ;;
+                termux-tasker)  suffix="Tasker" ;;
+                termux-widget)  suffix="Widget" ;;
+            esac
+
+            file=""
+            for candidate in \
+                "termux-apps-main/$addon/app/src/main/res/values/strings.xml" \
+                "termux-apps-main/$addon/src/main/res/values/strings.xml"; do
+                [[ -f "$candidate" ]] && { file="$candidate"; break; }
+            done
+            [[ -z "$file" ]] && continue
+
+            NAME="$display" LABEL="$display:$suffix" PACKAGE="$TERMUX_APP__PACKAGE_NAME" perl -pi -e '
+                s{\Q$ENV{PACKAGE}\E:}{$ENV{NAME}:}g;
+                s{(<!ENTITY\s+TERMUX_APP_NAME\s+")[^"]*(">)}{${1}$ENV{NAME}${2}};
+                s{(<!ENTITY\s+TERMUX_[A-Z0-9_]+_APP_NAME\s+")[^"]*(">)}{${1}$ENV{LABEL}${2}};
+                s{(<string name="(?:app_name|application_name)">)[^<]*(</string>)}{${1}$ENV{LABEL}${2}};
+            ' "$file"
+        done
+    fi
 }
 
 build_termux_x11() {

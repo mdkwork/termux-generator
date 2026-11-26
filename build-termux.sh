@@ -6,6 +6,7 @@ cd "$(realpath "$(dirname "$0")")"
 
 TERMUX_GENERATOR_HOME="$(pwd)"
 TERMUX_APP__PACKAGE_NAME="com.termux"
+TERMUX_APP__DISPLAY_NAME="Termux"
 TERMUX_APP__USER_PATH="/data/data"
 TERMUX_APP_TYPE="f-droid"
 DO_NOT_CLEAN=""
@@ -41,6 +42,7 @@ show_usage() {
     echo " -h, --help                       Show this help."
     echo " -a, --add PKG_LIST               Include additional packages in bootstrap archive."
     echo " -n, --name APP_NAME              Specify TERMUX_APP__PACKAGE_NAME name."
+    echo " -N, --display-name NAME          Specify visible app display name."
     echo " -u, --user-path USER_PATH        Specify TERMUX_APP__USER_PATH path."
     echo " -t, --type APP_TYPE              Specify the Termux project to fork [f-droid, play-store]. Defaults to f-droid."
     echo " --architectures ARCH_LIST        Specify the bootstrap architectures to include in a comma-separated list."
@@ -107,6 +109,16 @@ while (($# > 0)); do
                 shift 1
             else
                 echo "[!] Option '--name' requires an argument."
+                show_usage
+                exit 1
+            fi
+            ;;
+        -N|--display-name)
+            if [ $# -gt 1 ] && [ -n "$2" ] && [[ $2 != -* ]]; then
+                TERMUX_APP__DISPLAY_NAME="$2"
+                shift 1
+            else
+                echo "[!] Option '--display-name' requires an argument."
                 show_usage
                 exit 1
             fi

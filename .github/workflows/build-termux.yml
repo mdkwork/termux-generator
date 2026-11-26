@@ -9,6 +9,9 @@ on:
       name:
         description: "Specify TERMUX_APP__PACKAGE_NAME name."
         required: false
+      display-name:
+        description: "Specify visible app display name."
+        required: false
       user-path:
         description: "Specify TERMUX_APP__USER_PATH path."
         required: false
@@ -84,6 +87,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    env:
+      INPUT_DISPLAY_NAME: ${{ inputs.display-name }}
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
@@ -142,8 +147,14 @@ jobs:
         if: "${{ github.event.inputs.plugin != '' }}"
         run: echo "PLUGIN=--plugin ${{ github.event.inputs.plugin }}" >> $GITHUB_ENV
       - name: Build Termux
+        shell: bash
         run: |
+          display_args=()
+          if [[ -n "$INPUT_DISPLAY_NAME" ]]; then
+              display_args=(--display-name "$INPUT_DISPLAY_NAME")
+          fi
           ./build-termux.sh \
+                "${display_args[@]}" \
                 $ADDITIONAL_PACKAGES \
                 $TERMUX_APP__PACKAGE_NAME \
                 $TERMUX_APP_TYPE \
