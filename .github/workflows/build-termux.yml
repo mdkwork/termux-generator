@@ -87,88 +87,53 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    env:
+      INPUT_ADD: ${{ inputs.add }}
+      INPUT_NAME: ${{ inputs.name }}
+      INPUT_DISPLAY_NAME: ${{ inputs.display-name }}
+      INPUT_USER_PATH: ${{ inputs.user-path }}
+      INPUT_TYPE: ${{ inputs.type }}
+      INPUT_ARCHITECTURES: ${{ inputs.architectures }}
+      INPUT_BOOTSTRAP_SECOND_STAGE: ${{ inputs.bootstrap-second-stage }}
+      INPUT_SSH_SERVER: ${{ inputs.ssh-server }}
+      INPUT_BOOTSTRAP: ${{ inputs.bootstrap }}
+      INPUT_TERMINAL: ${{ inputs.terminal }}
+      INPUT_TASKER: ${{ inputs.tasker }}
+      INPUT_FLOAT: ${{ inputs.float }}
+      INPUT_WIDGET: ${{ inputs.widget }}
+      INPUT_API: ${{ inputs.api }}
+      INPUT_BOOT: ${{ inputs.boot }}
+      INPUT_STYLING: ${{ inputs.styling }}
+      INPUT_GUI: ${{ inputs.gui }}
+      INPUT_X11: ${{ inputs.x11 }}
+      INPUT_PLUGIN: ${{ inputs.plugin }}
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
-      - name: Set --add
-        if: "${{ github.event.inputs.add != '' }}"
-        run: echo "ADDITIONAL_PACKAGES=--add ${{ github.event.inputs.add }}" >> $GITHUB_ENV
-      - name: Set --name
-        if: "${{ github.event.inputs.name != '' }}"
-        run: echo "TERMUX_APP__PACKAGE_NAME=--name ${{ github.event.inputs.name }}" >> $GITHUB_ENV
-      - name: Set --display-name
-        if: "${{ github.event.inputs.display-name != '' }}"
-        run: echo "TERMUX_APP__DISPLAY_NAME=--display-name ${{ github.event.inputs.display-name }}" >> $GITHUB_ENV
-      - name: Set --user-path
-        if: "${{ github.event.inputs.user-path != '' }}"
-        run: echo "TERMUX_APP__USER_PATH=--user-path ${{ github.event.inputs.user-path }}" >> $GITHUB_ENV
-      - name: Set --type
-        if: "${{ github.event.inputs.type != '' }}"
-        run: echo "TERMUX_APP_TYPE=--type ${{ github.event.inputs.type }}" >> $GITHUB_ENV
-      - name: Set --architectures
-        if: "${{ github.event.inputs.architectures != '' }}"
-        run: echo "BOOTSTRAP_ARCHITECTURES=--architectures ${{ github.event.inputs.architectures }}" >> $GITHUB_ENV
-      - name: Set --disable-bootstrap-second-stage
-        if: "${{ github.event.inputs.bootstrap-second-stage == 'false' }}"
-        run: echo "DISABLE_BOOTSTRAP_SECOND_STAGE=--disable-bootstrap-second-stage" >> $GITHUB_ENV
-      - name: Set --enable-ssh-server
-        if: "${{ github.event.inputs.ssh-server == 'true' }}"
-        run: echo "ENABLE_SSH_SERVER=--enable-ssh-server" >> $GITHUB_ENV
-      - name: Set --disable-bootstrap
-        if: "${{ github.event.inputs.bootstrap == 'false' }}"
-        run: echo "DISABLE_BOOTSTRAP=--disable-bootstrap" >> $GITHUB_ENV
-      - name: Set --disable-terminal
-        if: "${{ github.event.inputs.terminal == 'false' }}"
-        run: echo "DISABLE_TERMINAL=--disable-terminal" >> $GITHUB_ENV
-      - name: Set --disable-tasker
-        if: "${{ github.event.inputs.tasker == 'false' }}"
-        run: echo "DISABLE_TASKER=--disable-tasker" >> $GITHUB_ENV
-      - name: Set --disable-float
-        if: "${{ github.event.inputs.float == 'false' }}"
-        run: echo "DISABLE_FLOAT=--disable-float" >> $GITHUB_ENV
-      - name: Set --disable-widget
-        if: "${{ github.event.inputs.widget == 'false' }}"
-        run: echo "DISABLE_WIDGET=--disable-widget" >> $GITHUB_ENV
-      - name: Set --disable-api
-        if: "${{ github.event.inputs.api == 'false' }}"
-        run: echo "DISABLE_API=--disable-api" >> $GITHUB_ENV
-      - name: Set --disable-boot
-        if: "${{ github.event.inputs.boot == 'false' }}"
-        run: echo "DISABLE_BOOT=--disable-boot" >> $GITHUB_ENV
-      - name: Set --disable-styling
-        if: "${{ github.event.inputs.styling == 'false' }}"
-        run: echo "DISABLE_STYLING=--disable-styling" >> $GITHUB_ENV
-      - name: Set --disable-gui
-        if: "${{ github.event.inputs.gui == 'false' }}"
-        run: echo "DISABLE_GUI=--disable-gui" >> $GITHUB_ENV
-      - name: Set --disable-x11
-        if: "${{ github.event.inputs.x11 == 'false' }}"
-        run: echo "DISABLE_X11=--disable-x11" >> $GITHUB_ENV
-      - name: Set --plugin
-        if: "${{ github.event.inputs.plugin != '' }}"
-        run: echo "PLUGIN=--plugin ${{ github.event.inputs.plugin }}" >> $GITHUB_ENV
       - name: Build Termux
+        shell: bash
         run: |
+          set -euo pipefail
           args=()
-          [ -n "${{ github.event.inputs.add }}" ] && args+=(--add "${{ github.event.inputs.add }}")
-          [ -n "${{ github.event.inputs.name }}" ] && args+=(--name "${{ github.event.inputs.name }}")
-          [ -n "${{ github.event.inputs.display-name }}" ] && args+=(--display-name "${{ github.event.inputs.display-name }}")
-          [ -n "${{ github.event.inputs.user-path }}" ] && args+=(--user-path "${{ github.event.inputs.user-path }}")
-          [ -n "${{ github.event.inputs.type }}" ] && args+=(--type "${{ github.event.inputs.type }}")
-          [ -n "${{ github.event.inputs.architectures }}" ] && args+=(--architectures "${{ github.event.inputs.architectures }}")
-          [ "${{ github.event.inputs.bootstrap-second-stage }}" = "false" ] && args+=(--disable-bootstrap-second-stage)
-          [ "${{ github.event.inputs.ssh-server }}" = "true" ] && args+=(--enable-ssh-server)
-          [ "${{ github.event.inputs.bootstrap }}" = "false" ] && args+=(--disable-bootstrap)
-          [ "${{ github.event.inputs.terminal }}" = "false" ] && args+=(--disable-terminal)
-          [ "${{ github.event.inputs.tasker }}" = "false" ] && args+=(--disable-tasker)
-          [ "${{ github.event.inputs.float }}" = "false" ] && args+=(--disable-float)
-          [ "${{ github.event.inputs.widget }}" = "false" ] && args+=(--disable-widget)
-          [ "${{ github.event.inputs.api }}" = "false" ] && args+=(--disable-api)
-          [ "${{ github.event.inputs.boot }}" = "false" ] && args+=(--disable-boot)
-          [ "${{ github.event.inputs.styling }}" = "false" ] && args+=(--disable-styling)
-          [ "${{ github.event.inputs.gui }}" = "false" ] && args+=(--disable-gui)
-          [ "${{ github.event.inputs.x11 }}" = "false" ] && args+=(--disable-x11)
-          [ -n "${{ github.event.inputs.plugin }}" ] && args+=(--plugin "${{ github.event.inputs.plugin }}")
+          if [[ -n "$INPUT_ADD" ]]; then args+=(--add "$INPUT_ADD"); fi
+          if [[ -n "$INPUT_NAME" ]]; then args+=(--name "$INPUT_NAME"); fi
+          if [[ -n "$INPUT_DISPLAY_NAME" ]]; then args+=(--display-name "$INPUT_DISPLAY_NAME"); fi
+          if [[ -n "$INPUT_USER_PATH" ]]; then args+=(--user-path "$INPUT_USER_PATH"); fi
+          if [[ -n "$INPUT_TYPE" ]]; then args+=(--type "$INPUT_TYPE"); fi
+          if [[ -n "$INPUT_ARCHITECTURES" ]]; then args+=(--architectures "$INPUT_ARCHITECTURES"); fi
+          if [[ "$INPUT_BOOTSTRAP_SECOND_STAGE" == "false" ]]; then args+=(--disable-bootstrap-second-stage); fi
+          if [[ "$INPUT_SSH_SERVER" == "true" ]]; then args+=(--enable-ssh-server); fi
+          if [[ "$INPUT_BOOTSTRAP" == "false" ]]; then args+=(--disable-bootstrap); fi
+          if [[ "$INPUT_TERMINAL" == "false" ]]; then args+=(--disable-terminal); fi
+          if [[ "$INPUT_TASKER" == "false" ]]; then args+=(--disable-tasker); fi
+          if [[ "$INPUT_FLOAT" == "false" ]]; then args+=(--disable-float); fi
+          if [[ "$INPUT_WIDGET" == "false" ]]; then args+=(--disable-widget); fi
+          if [[ "$INPUT_API" == "false" ]]; then args+=(--disable-api); fi
+          if [[ "$INPUT_BOOT" == "false" ]]; then args+=(--disable-boot); fi
+          if [[ "$INPUT_STYLING" == "false" ]]; then args+=(--disable-styling); fi
+          if [[ "$INPUT_GUI" == "false" ]]; then args+=(--disable-gui); fi
+          if [[ "$INPUT_X11" == "false" ]]; then args+=(--disable-x11); fi
+          if [[ -n "$INPUT_PLUGIN" ]]; then args+=(--plugin "$INPUT_PLUGIN"); fi
           ./build-termux.sh "${args[@]}"
       - name: Upload artifacts
         uses: actions/upload-artifact@v4.6.0

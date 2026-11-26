@@ -147,26 +147,52 @@ patch_apps() {
 			termux-apps-main/termux-x11/shell-loader/companion-package.gradle
 	fi
 
-    # --- CHANGE VISIBLE APP NAME ---
-    if [[ "$TERMUX_APP__DISPLAY_NAME" != "Termux" ]]; then
-        echo "[*] Changing visible app name to '$TERMUX_APP__DISPLAY_NAME'..."
-        local strings_file=$(find termux-apps-main -path "*/res/values/strings.xml" | grep "termux-app" | head -n 1)
-        if [ -n "$strings_file" ]; then
-            # Replace the XML entity used by upstream Termux
-            portable_sed_i -e "s|&TERMUX_APP_NAME;|$TERMUX_APP__DISPLAY_NAME|g" "$strings_file"
-            # Fallback string replacement
-            portable_sed_i -e "s|<string name=\"application_name\">.*</string>|<string name=\"application_name\">$TERMUX_APP__DISPLAY_NAME</string>|g" "$strings_file"
-        else
-            echo "[!] Warning: Could not find strings.xml to change the app name."
-        fi
-    fi
-    # ---------------------------------
-
     if [[ "$TERMUX_APP__PACKAGE_NAME" != "com.termux" ]]; then
 		replace_termux_name termux-apps-main "$TERMUX_APP__PACKAGE_NAME"
 
 		migrate_termux_folder_tree termux-apps-main "$TERMUX_APP__PACKAGE_NAME"
     fi
+
+    # --- CHANGE VISIBLE APP NAME ---
+    # Must run AFTER replace_termux_name(): that helper rewrites every quoted
+    # "Termux" (including the TERMUX_APP_NAME entity declaration) to the custom
+    # package name, which is what the launcher would otherwise display.
+    if [[ -n "$TERMUX_APP__DISPLAY_NAME" && "$TERMUX_APP__DISPLAY_NAME" != "Termux" ]]; then
+        local strings_file
+        if [[ "$TERMUX_APP_TYPE" == "play-store" ]]; then
+            strings_file="termux-apps-main/termux-app/src/main/res/values/strings.xml"
+        else
+            strings_file="termux-apps-main/termux-app/app/src/main/res/values/strings.xml"
+        fi
+
+        if [[ -f "$strings_file" ]]; then
+            echo "[*] Changing visible app name to '$TERMUX_APP__DISPLAY_NAME'..."
+
+            # Make the value safe inside an XML entity declaration.
+            local display_name_xml="$TERMUX_APP__DISPLAY_NAME"
+            # Bash replaces an unescaped '&' in the substitution with the
+            # matched text, so escape it to emit literal XML entities.
+            display_name_xml="${display_name_xml//&/\&amp;}"
+            display_name_xml="${display_name_xml//</\&lt;}"
+            display_name_xml="${display_name_xml//>/\&gt;}"
+            display_name_xml="${display_name_xml//\"/\&quot;}"
+
+            # Target the exact upstream structure:
+            #   <!ENTITY TERMUX_APP_NAME "Termux">
+            # After the package rename this may already read
+            #   <!ENTITY TERMUX_APP_NAME "com.momoemi.customer">
+            DISPLAY_NAME_XML="$display_name_xml" perl -pi -e \
+                's{(<!ENTITY\s+TERMUX_APP_NAME\s+")[^"]*(">)}{${1}$ENV{DISPLAY_NAME_XML}${2}}' \
+                "$strings_file"
+
+            if ! grep -Fq "<!ENTITY TERMUX_APP_NAME \"$display_name_xml\">" "$strings_file"; then
+                echo "[!] Warning: failed to set TERMUX_APP_NAME in $strings_file"
+            fi
+        else
+            echo "[!] Warning: Could not find $strings_file to change the app name."
+        fi
+    fi
+    # ---------------------------------
 }
 
 build_termux_x11() {
