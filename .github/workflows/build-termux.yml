@@ -41,31 +41,31 @@ on:
 
       # ---------- Bootstrap architectures ----------
       architecture-all:
-        description: "Build all architectures (aarch64, arm, x86_64, i686). When checked, the four boxes below are ignored."
+        description: "Build all architectures (aarch64, arm, x86_64, i686). Checking any individual box below overrides this."
         required: false
         type: boolean
         default: true
 
       architecture-aarch64:
-        description: "Build aarch64 (ARM64). Only used when 'architecture-all' is unchecked."
+        description: "Build aarch64 (ARM64). Overrides 'architecture-all' when checked."
         required: false
         type: boolean
         default: false
 
       architecture-arm:
-        description: "Build arm (ARMv7). Only used when 'architecture-all' is unchecked."
+        description: "Build arm (ARMv7). Overrides 'architecture-all' when checked."
         required: false
         type: boolean
         default: false
 
       architecture-x86_64:
-        description: "Build x86_64. Only used when 'architecture-all' is unchecked."
+        description: "Build x86_64. Overrides 'architecture-all' when checked."
         required: false
         type: boolean
         default: false
 
       architecture-i686:
-        description: "Build i686 (x86 32-bit). Only used when 'architecture-all' is unchecked."
+        description: "Build i686 (x86 32-bit). Overrides 'architecture-all' when checked."
         required: false
         type: boolean
         default: false
@@ -176,22 +176,24 @@ jobs:
           fi
 
           # ---------- resolve architecture selection ----------
+          # Rule: any checked individual architecture overrides 'architecture-all'.
           archs=()
-          if [[ "$IN_ARCH_ALL" == "true" ]]; then
+          [[ "$IN_ARCH_AARCH64" == "true" ]] && archs+=(aarch64)
+          [[ "$IN_ARCH_ARM"     == "true" ]] && archs+=(arm)
+          [[ "$IN_ARCH_X86_64"  == "true" ]] && archs+=(x86_64)
+          [[ "$IN_ARCH_I686"    == "true" ]] && archs+=(i686)
+
+          if [[ ${#archs[@]} -gt 0 ]]; then
+            if [[ "$IN_ARCH_ALL" == "true" ]]; then
+              echo "::warning::Individual architecture(s) selected; 'architecture-all' is being ignored."
+            fi
+          elif [[ "$IN_ARCH_ALL" == "true" ]]; then
             archs=(aarch64 arm x86_64 i686)
-            if [[ "${IN_ARCH_AARCH64}${IN_ARCH_ARM}${IN_ARCH_X86_64}${IN_ARCH_I686}" == *true* ]]; then
-              echo "::warning::'architecture-all' is checked; the individual architecture boxes are ignored."
-            fi
           else
-            if [[ "$IN_ARCH_AARCH64" == "true" ]]; then archs+=(aarch64); fi
-            if [[ "$IN_ARCH_ARM"     == "true" ]]; then archs+=(arm);     fi
-            if [[ "$IN_ARCH_X86_64"  == "true" ]]; then archs+=(x86_64);  fi
-            if [[ "$IN_ARCH_I686"    == "true" ]]; then archs+=(i686);    fi
-            if [[ ${#archs[@]} -eq 0 ]]; then
-              echo "::error::No architectures selected. Check 'architecture-all' or at least one individual architecture."
-              exit 1
-            fi
+            echo "::error::No architectures selected. Check 'architecture-all' or at least one individual architecture."
+            exit 1
           fi
+
           IN_ARCHITECTURES="$(IFS=,; echo "${archs[*]}")"
           echo "Selected architectures: $IN_ARCHITECTURES"
 
