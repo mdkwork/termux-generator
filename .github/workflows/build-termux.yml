@@ -9,6 +9,9 @@ on:
       name:
         description: "Specify TERMUX_APP__PACKAGE_NAME name."
         required: false
+      display-name:
+        description: "Specify visible app display name."
+        required: false
       user-path:
         description: "Specify TERMUX_APP__USER_PATH path."
         required: false
@@ -93,9 +96,12 @@ jobs:
       - name: Set --name
         if: "${{ github.event.inputs.name != '' }}"
         run: echo "TERMUX_APP__PACKAGE_NAME=--name ${{ github.event.inputs.name }}" >> $GITHUB_ENV
+      - name: Set --display-name
+        if: "${{ github.event.inputs.display-name != '' }}"
+        run: echo "TERMUX_APP__DISPLAY_NAME=--display-name ${{ github.event.inputs.display-name }}" >> $GITHUB_ENV
       - name: Set --user-path
         if: "${{ github.event.inputs.user-path != '' }}"
-        run: echo "TERMUX_APP__PACKAGE_NAME=--user-path ${{ github.event.inputs.user-path }}" >> $GITHUB_ENV
+        run: echo "TERMUX_APP__USER_PATH=--user-path ${{ github.event.inputs.user-path }}" >> $GITHUB_ENV
       - name: Set --type
         if: "${{ github.event.inputs.type != '' }}"
         run: echo "TERMUX_APP_TYPE=--type ${{ github.event.inputs.type }}" >> $GITHUB_ENV
@@ -143,24 +149,27 @@ jobs:
         run: echo "PLUGIN=--plugin ${{ github.event.inputs.plugin }}" >> $GITHUB_ENV
       - name: Build Termux
         run: |
-          ./build-termux.sh \
-                $ADDITIONAL_PACKAGES \
-                $TERMUX_APP__PACKAGE_NAME \
-                $TERMUX_APP_TYPE \
-                $BOOTSTRAP_ARCHITECTURES \
-                $DISABLE_BOOTSTRAP_SECOND_STAGE \
-                $ENABLE_SSH_SERVER \
-                $DISABLE_BOOTSTRAP \
-                $DISABLE_TERMINAL \
-                $DISABLE_TASKER \
-                $DISABLE_FLOAT \
-                $DISABLE_WIDGET \
-                $DISABLE_API \
-                $DISABLE_BOOT \
-                $DISABLE_STYLING \
-                $DISABLE_GUI \
-                $DISABLE_X11 \
-                $PLUGIN
+          args=()
+          [ -n "${{ github.event.inputs.add }}" ] && args+=(--add "${{ github.event.inputs.add }}")
+          [ -n "${{ github.event.inputs.name }}" ] && args+=(--name "${{ github.event.inputs.name }}")
+          [ -n "${{ github.event.inputs.display-name }}" ] && args+=(--display-name "${{ github.event.inputs.display-name }}")
+          [ -n "${{ github.event.inputs.user-path }}" ] && args+=(--user-path "${{ github.event.inputs.user-path }}")
+          [ -n "${{ github.event.inputs.type }}" ] && args+=(--type "${{ github.event.inputs.type }}")
+          [ -n "${{ github.event.inputs.architectures }}" ] && args+=(--architectures "${{ github.event.inputs.architectures }}")
+          [ "${{ github.event.inputs.bootstrap-second-stage }}" = "false" ] && args+=(--disable-bootstrap-second-stage)
+          [ "${{ github.event.inputs.ssh-server }}" = "true" ] && args+=(--enable-ssh-server)
+          [ "${{ github.event.inputs.bootstrap }}" = "false" ] && args+=(--disable-bootstrap)
+          [ "${{ github.event.inputs.terminal }}" = "false" ] && args+=(--disable-terminal)
+          [ "${{ github.event.inputs.tasker }}" = "false" ] && args+=(--disable-tasker)
+          [ "${{ github.event.inputs.float }}" = "false" ] && args+=(--disable-float)
+          [ "${{ github.event.inputs.widget }}" = "false" ] && args+=(--disable-widget)
+          [ "${{ github.event.inputs.api }}" = "false" ] && args+=(--disable-api)
+          [ "${{ github.event.inputs.boot }}" = "false" ] && args+=(--disable-boot)
+          [ "${{ github.event.inputs.styling }}" = "false" ] && args+=(--disable-styling)
+          [ "${{ github.event.inputs.gui }}" = "false" ] && args+=(--disable-gui)
+          [ "${{ github.event.inputs.x11 }}" = "false" ] && args+=(--disable-x11)
+          [ -n "${{ github.event.inputs.plugin }}" ] && args+=(--plugin "${{ github.event.inputs.plugin }}")
+          ./build-termux.sh "${args[@]}"
       - name: Upload artifacts
         uses: actions/upload-artifact@v4.6.0
         with:

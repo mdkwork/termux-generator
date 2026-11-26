@@ -147,6 +147,21 @@ patch_apps() {
 			termux-apps-main/termux-x11/shell-loader/companion-package.gradle
 	fi
 
+    # --- CHANGE VISIBLE APP NAME ---
+    if [[ "$TERMUX_APP__DISPLAY_NAME" != "Termux" ]]; then
+        echo "[*] Changing visible app name to '$TERMUX_APP__DISPLAY_NAME'..."
+        local strings_file=$(find termux-apps-main -path "*/res/values/strings.xml" | grep "termux-app" | head -n 1)
+        if [ -n "$strings_file" ]; then
+            # First, replace the XML entity used by upstream Termux
+            portable_sed_i -e "s|&TERMUX_APP_NAME;|$TERMUX_APP__DISPLAY_NAME|g" "$strings_file"
+            # Also, try the direct string replacement as a fallback
+            portable_sed_i -e "s|<string name=\"application_name\">.*</string>|<string name=\"application_name\">$TERMUX_APP__DISPLAY_NAME</string>|g" "$strings_file"
+        else
+            echo "[!] Warning: Could not find strings.xml to change the app name."
+        fi
+    fi
+    # ---------------------------------
+
     if [[ "$TERMUX_APP__PACKAGE_NAME" != "com.termux" ]]; then
 		replace_termux_name termux-apps-main "$TERMUX_APP__PACKAGE_NAME"
 
