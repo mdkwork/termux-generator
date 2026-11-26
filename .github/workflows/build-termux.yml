@@ -27,11 +27,6 @@ on:
         required: false
         type: string
 
-      architectures:
-        description: "Bootstrap architectures, comma-separated. Allowed: aarch64,arm,x86_64,i686. Leave empty for all."
-        required: false
-        type: string
-
       bootstrap-second-stage:
         description: "Run termux-bootstrap-second-stage.sh automatically after bootstrap extraction."
         required: false
@@ -40,6 +35,37 @@ on:
 
       ssh-server:
         description: "Bundle an SSH server (default password: changeme)."
+        required: false
+        type: boolean
+        default: false
+
+      # ---------- Bootstrap architectures ----------
+      architecture-all:
+        description: "Build all architectures (aarch64, arm, x86_64, i686). When checked, the four boxes below are ignored."
+        required: false
+        type: boolean
+        default: true
+
+      architecture-aarch64:
+        description: "Build aarch64 (ARM64). Only used when 'architecture-all' is unchecked."
+        required: false
+        type: boolean
+        default: false
+
+      architecture-arm:
+        description: "Build arm (ARMv7). Only used when 'architecture-all' is unchecked."
+        required: false
+        type: boolean
+        default: false
+
+      architecture-x86_64:
+        description: "Build x86_64. Only used when 'architecture-all' is unchecked."
+        required: false
+        type: boolean
+        default: false
+
+      architecture-i686:
+        description: "Build i686 (x86 32-bit). Only used when 'architecture-all' is unchecked."
         required: false
         type: boolean
         default: false
@@ -110,13 +136,21 @@ jobs:
 
       - name: Assemble build arguments
         env:
+          # identity
           IN_ADD:           ${{ inputs.add }}
           IN_NAME:          ${{ inputs.name }}
           IN_USER_PATH:     ${{ inputs.user-path }}
           IN_TYPE:          ${{ inputs.type }}
-          IN_ARCHITECTURES: ${{ inputs.architectures }}
+          # architectures
+          IN_ARCH_ALL:      ${{ inputs.architecture-all }}
+          IN_ARCH_AARCH64:  ${{ inputs.architecture-aarch64 }}
+          IN_ARCH_ARM:      ${{ inputs.architecture-arm }}
+          IN_ARCH_X86_64:   ${{ inputs.architecture-x86_64 }}
+          IN_ARCH_I686:     ${{ inputs.architecture-i686 }}
+          # bootstrap options
           IN_2ND_STAGE:     ${{ inputs.bootstrap-second-stage }}
           IN_SSH:           ${{ inputs.ssh-server }}
+          # component toggles
           IN_BOOTSTRAP:     ${{ inputs.bootstrap }}
           IN_TERMINAL:      ${{ inputs.terminal }}
           IN_TASKER:        ${{ inputs.tasker }}
@@ -131,44 +165,60 @@ jobs:
         run: |
           set -euo pipefail
 
-          # --- validation: fail fast with a clear message ---
+          # ---------- validation: fail fast with a clear message ----------
           if [[ -n "$IN_NAME" && ! "$IN_NAME" =~ ^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$ ]]; then
-            echo "::error::Invalid package name '$IN_NAME'"
-            exit 1
-          fi
-          if [[ -n "$IN_ARCHITECTURES" && ! "$IN_ARCHITECTURES" =~ ^(aarch64|arm|x86_64|i686)(,(aarch64|arm|x86_64|i686))*$ ]]; then
-            echo "::error::Invalid architectures '$IN_ARCHITECTURES'"
+            echo "::error::Invalid package name '$IN_NAME' (must be a valid Android application ID)."
             exit 1
           fi
           if [[ -n "$IN_USER_PATH" && "$IN_USER_PATH" != /* ]]; then
-            echo "::error::user-path must be absolute (got '$IN_USER_PATH')"
+            echo "::error::user-path must be absolute (got '$IN_USER_PATH')."
             exit 1
           fi
 
-          # --- build the argument list ---
+          # ---------- resolve architecture selection ----------
+          archs=()
+          if [[ "$IN_ARCH_ALL" == "true" ]]; then
+            archs=(aarch64 arm x86_64 i686)
+            if [[ "${IN_ARCH_AARCH64}${IN_ARCH_ARM}${IN_ARCH_X86_64}${IN_ARCH_I686}" == *true* ]]; then
+              echo "::warning::'architecture-all' is checked; the individual architecture boxes are ignored."
+            fi
+          else
+            if [[ "$IN_ARCH_AARCH64" == "true" ]]; then archs+=(aarch64); fi
+            if [[ "$IN_ARCH_ARM"     == "true" ]]; then archs+=(arm);     fi
+            if [[ "$IN_ARCH_X86_64"  == "true" ]]; then archs+=(x86_64);  fi
+            if [[ "$IN_ARCH_I686"    == "true" ]]; then archs+=(i686);    fi
+            if [[ ${#archs[@]} -eq 0 ]]; then
+              echo "::error::No architectures selected. Check 'architecture-all' or at least one individual architecture."
+              exit 1
+            fi
+          fi
+          IN_ARCHITECTURES="$(IFS=,; echo "${archs[*]}")"
+          echo "Selected architectures: $IN_ARCHITECTURES"
+
+          # ---------- assemble the argument list ----------
           args=()
-          [[ -n "$IN_ADD"           ]] && args+=(--add "$IN_ADD")
-          [[ -n "$IN_NAME"          ]] && args+=(--name "$IN_NAME")
-          [[ -n "$IN_USER_PATH"     ]] && args+=(--user-path "$IN_USER_PATH")
-          [[ -n "$IN_TYPE"          ]] && args+=(--type "$IN_TYPE")
-          [[ -n "$IN_ARCHITECTURES" ]] && args+=(--architectures "$IN_ARCHITECTURES")
-          [[ "$IN_2ND_STAGE" == "false" ]] && args+=(--disable-bootstrap-second-stage)
-          [[ "$IN_SSH"       == "true"  ]] && args+=(--enable-ssh-server)
-          [[ "$IN_BOOTSTRAP" == "false" ]] && args+=(--disable-bootstrap)
-          [[ "$IN_TERMINAL"  == "false" ]] && args+=(--disable-terminal)
-          [[ "$IN_TASKER"    == "false" ]] && args+=(--disable-tasker)
-          [[ "$IN_FLOAT"     == "false" ]] && args+=(--disable-float)
-          [[ "$IN_WIDGET"    == "false" ]] && args+=(--disable-widget)
-          [[ "$IN_API"       == "false" ]] && args+=(--disable-api)
-          [[ "$IN_BOOT"      == "false" ]] && args+=(--disable-boot)
-          [[ "$IN_STYLING"   == "false" ]] && args+=(--disable-styling)
-          [[ "$IN_GUI"       == "false" ]] && args+=(--disable-gui)
-          [[ "$IN_X11"       == "false" ]] && args+=(--disable-x11)
-          [[ -n "$IN_PLUGIN" ]] && args+=(--plugin "$IN_PLUGIN")
+          if [[ -n "$IN_ADD"       ]]; then args+=(--add "$IN_ADD"); fi
+          if [[ -n "$IN_NAME"      ]]; then args+=(--name "$IN_NAME"); fi
+          if [[ -n "$IN_USER_PATH" ]]; then args+=(--user-path "$IN_USER_PATH"); fi
+          if [[ -n "$IN_TYPE"      ]]; then args+=(--type "$IN_TYPE"); fi
+          args+=(--architectures "$IN_ARCHITECTURES")
+          if [[ "$IN_2ND_STAGE" == "false" ]]; then args+=(--disable-bootstrap-second-stage); fi
+          if [[ "$IN_SSH"       == "true"  ]]; then args+=(--enable-ssh-server); fi
+          if [[ "$IN_BOOTSTRAP" == "false" ]]; then args+=(--disable-bootstrap); fi
+          if [[ "$IN_TERMINAL"  == "false" ]]; then args+=(--disable-terminal); fi
+          if [[ "$IN_TASKER"    == "false" ]]; then args+=(--disable-tasker); fi
+          if [[ "$IN_FLOAT"     == "false" ]]; then args+=(--disable-float); fi
+          if [[ "$IN_WIDGET"    == "false" ]]; then args+=(--disable-widget); fi
+          if [[ "$IN_API"       == "false" ]]; then args+=(--disable-api); fi
+          if [[ "$IN_BOOT"      == "false" ]]; then args+=(--disable-boot); fi
+          if [[ "$IN_STYLING"   == "false" ]]; then args+=(--disable-styling); fi
+          if [[ "$IN_GUI"       == "false" ]]; then args+=(--disable-gui); fi
+          if [[ "$IN_X11"       == "false" ]]; then args+=(--disable-x11); fi
+          if [[ -n "$IN_PLUGIN" ]]; then args+=(--plugin "$IN_PLUGIN"); fi
 
           echo "Build arguments: ${args[*]:-(none)}"
 
-          # persist across steps; printf %q keeps quoting safe
+          # ---------- persist to subsequent steps (quoting-safe) ----------
           {
             echo "BUILD_ARGS<<EOF"
             printf '%q ' "${args[@]}"
